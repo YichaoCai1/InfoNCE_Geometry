@@ -1,7 +1,7 @@
-# InfoNCE Geometry — Numeric Validations
+# InfoNCE Geometry
 
 This repository contains the numerical validations used the paper:
- *The Geometric Mechanics of Contrastive Representation Learning: Alignment Potentials, Entropic Dispersion, and Cross-Modal Divergence*. 
+ *The Geometric Mechanics of Contrastive Representation Learning: Alignment Potentials, Entropic Dispersion, and Cross-Modal Divergence* (https://arxiv.org/abs/2601.19597). 
 
 ## Directory structure
 - `grad_consistency/` — large-batch gradient consistency vs number of negatives.
@@ -19,3 +19,20 @@ pip install numpy matplotlib torch
 ## Reproducing figures
 
 Each experiment is self-contained. Change into the corresponding subdirectory and run the script. PDFs will be written to the same folder by default.
+
+<p align="center">
+  <img src="unimodal_gibbs/animation/uni_train_s2_potential_overlay_evolution.gif"
+       alt="Unimodal hypersphere distribution animation"
+       width="820">
+    <br/>
+  <em>Unimodal hypersphere distribution animation.</em>
+</p>
+
+
+<p align="center">
+  <img src="modality_gap/mm_joint_cosine_anim_grid_2x4_individual_cbars.gif"
+       alt="Unimodal hypersphere distribution animation"
+       width="820">
+    <br/>
+  <em>Unimodal hypersphere distribution animation.</em>
+</p>

@@ -23,10 +23,12 @@ Each experiment is self-contained. Change into the corresponding subdirectory an
 ## Animations
 
 ### Unimodal: hypersphere distribution evolution (MP4)
-https://github.com/user-attachments/assets/46d63fac-f912-4dd8-885b-1a35b7e349ec
+![Image](https://github.com/user-attachments/assets/693efa50-477d-4232-b6b6-ac56db311041)
 
 *Unimodal hypersphere distribution animation.*
 
 
 ## Multimodal: joint-angle coupling evolution
 ![Image](https://github.com/user-attachments/assets/af8ed31c-1a04-4209-9b46-0ebeb561406a)
+
+*Animated joint-angle coupling: The diagonal concentration indicates improved pairwise coupling, while persistent off-diagonal mass reflects mismatch-induced structure that does not disappear with longer training.*

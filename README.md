@@ -34,5 +34,5 @@ Each experiment is self-contained. Change into the corresponding subdirectory an
        alt="Unimodal hypersphere distribution animation"
        width="820">
     <br/>
-  <em>Unimodal hypersphere distribution animation.</em>
+  <em>Animated joint-angle coupling (1 frame per 10 steps). The diagonal concentration indicates improved pairwise coupling, while persistent off-diagonal mass reflects mismatch-induced structure that does not disappear with longer training.</em>
 </p>

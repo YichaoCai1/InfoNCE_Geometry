@@ -20,9 +20,13 @@ pip install numpy matplotlib torch
 
 Each experiment is self-contained. Change into the corresponding subdirectory and run the script. PDFs will be written to the same folder by default.
 
-## Unimodal: hypersphere distribution evolution
-<p align="center"> <a href="unimodal_gibbs/animation/uni_train_s2_potential_overlay_evolution.mp4"> <img src="unimodal_gibbs/animation/uni_train_s2_potential_and_overlays.png" width="820" alt="Unimodal hypersphere distribution animation (click to play)"> </a> <br/> <em>Unimodal hypersphere distribution animation (click to play).</em> </p>
+## Animations
+
+### Unimodal: hypersphere distribution evolution (MP4)
+https://github.com/user-attachments/assets/46d63fac-f912-4dd8-885b-1a35b7e349ec
+
+*Unimodal hypersphere distribution animation.*
 
 
 ## Multimodal: joint-angle coupling evolution
-<p align="center"> <img src="modality_gap/mm_joint_cosine_anim_grid_2x4_individual_cbars.gif" width="820" alt="Animated joint-angle coupling (1 frame per 10 steps)"> <br/> <em> Animated joint-angle coupling (1 frame per 10 steps). Diagonal concentration indicates improved pairwise coupling, while persistent off-diagonal mass reflects mismatch-induced structure that does not disappear with longer training. </em> </p>
+![](modality_gap/mm_joint_cosine_anim_grid_2x4_individual_cbars.gif)

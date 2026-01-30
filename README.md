@@ -29,4 +29,4 @@ https://github.com/user-attachments/assets/46d63fac-f912-4dd8-885b-1a35b7e349ec
 
 
 ## Multimodal: joint-angle coupling evolution
-![](modality_gap/mm_joint_cosine_anim_grid_2x4_individual_cbars.gif)
+![Image](https://github.com/user-attachments/assets/af8ed31c-1a04-4209-9b46-0ebeb561406a)

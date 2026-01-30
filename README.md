@@ -21,13 +21,13 @@ pip install numpy matplotlib torch
 Each experiment is self-contained. Change into the corresponding subdirectory and run the script. PDFs will be written to the same folder by default.
 
 <p align="center">
-  <img src="unimodal_gibbs/animation/uni_train_s2_potential_overlay_evolution.gif"
-       alt="Unimodal hypersphere distribution animation"
-       width="820">
-    <br/>
+  <video width="820" controls autoplay loop muted playsinline>
+    <source src="unimodal_gibbs/animation/uni_train_s2_potential_overlay_evolution.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+  <br/>
   <em>Unimodal hypersphere distribution animation.</em>
 </p>
-
 
 <p align="center">
   <img src="modality_gap/mm_joint_cosine_anim_grid_2x4_individual_cbars.gif"

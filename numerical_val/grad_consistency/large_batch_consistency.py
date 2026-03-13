@@ -170,13 +170,15 @@ def aggregate_and_save(Ns, all_cos, all_err, n_seeds, tag: str):
     err_mean, err_std = all_err.mean(0), all_err.std(0)
     
     # standard errors
-    cos_sem = cos_std / np.sqrt(n_seeds)
-    err_sem = err_std / np.sqrt(n_seeds)
+    # cos_sem = cos_std / np.sqrt(n_seeds)
+    # err_sem = err_std / np.sqrt(n_seeds)
+    cos_sem = cos_std
+    err_sem = err_std
     
     # Plot 1: cosine similarity
     fig, ax = plt.subplots(figsize=(3.35, 2.6))
     ax.fill_between(Ns, cos_mean - cos_sem, cos_mean + cos_sem, color='C0', alpha=0.2, linewidth=0, zorder=0)
-    ax.plot(Ns, cos_mean, marker="o", markersize=4, color='C0', linewidth=1.1, zorder=1, label="Mean $\pm$ SEM")
+    ax.plot(Ns, cos_mean, marker="o", markersize=2, color='C0', linewidth=1, zorder=1, label="Mean $\pm$ SEM")
     ax.set_xscale("log", base=2)
     ax.set_xticks(Ns)
     ax.set_xticklabels([str(n) for n in Ns])
@@ -192,7 +194,7 @@ def aggregate_and_save(Ns, all_cos, all_err, n_seeds, tag: str):
     # Plot 2: relative error
     fig, ax = plt.subplots(figsize=(3.35, 2.6))
     ax.fill_between(Ns, err_mean - err_sem, err_mean + err_sem, color='C0', alpha=0.2, linewidth=0, zorder=0)
-    ax.plot(Ns, err_mean, marker="o", markersize=4, color='C0', linewidth=1.1, zorder=1, label="Mean $\pm$ SEM")
+    ax.plot(Ns, err_mean, marker="o", markersize=2, color='C0', linewidth=1, zorder=1, label="Mean $\pm$ SEM")
     ax.set_xscale("log", base=2)
     ax.set_xticks(Ns)
     ax.set_xticklabels([str(n) for n in Ns])

@@ -77,6 +77,14 @@ def _build_eval_pair(seed, n_eval, misalign_sigma, mix_w, kappa, device, theta_e
     return theta_eval, theta2_eval
 
 
+def _build_shared_theta_eval(seed, n_eval, mix_w, kappa, device):
+    rng_state = _capture_rng_state(device)
+    set_seed(seed)
+    theta_eval = sample_theta_mixture(n_eval, w=mix_w, kappa=kappa, device=device)
+    _restore_rng_state(rng_state)
+    return theta_eval
+
+
 def sample_theta_mixture(n, w=0.7, mu1=0.0, mu2=math.pi, kappa=6.0, device="cpu"):
     comp = torch.bernoulli(torch.full((n,), w, device=device)).bool()
     vm = torch.distributions.VonMises
@@ -139,17 +147,16 @@ def sym_kl_from_angles_np(a1: np.ndarray, a2: np.ndarray, nbins=60, eps=1e-8):
     return float(dkl_pq + dkl_qp)
 
 
-def summarize_seed_gaps(gaps, seeds):
+def summarize_seed_gaps(gaps):
     gaps = np.asarray(gaps, dtype=float)
     if gaps.ndim != 1 or gaps.size == 0:
         raise ValueError("Expected a non-empty 1D array of seed gaps.")
     center = float(gaps.mean())
-    std = float(gaps.std(ddof=0))
-    band_low = center - std
-    band_high = center + std
-    label = "Mean +/- std"
-    short_label = "mean +/- std"
-    rep_idx = int(np.argmin(np.abs(gaps - center)))
+    sem = float(gaps.std(ddof=0) / np.sqrt(len(gaps)))
+    band_low = center - sem
+    band_high = center + sem
+    label = "Mean +/- SEM"
+    short_label = "mean +/- SEM"
 
     return {
         "center": center,
@@ -157,9 +164,9 @@ def summarize_seed_gaps(gaps, seeds):
         "band_high": band_high,
         "label": label,
         "short_label": short_label,
-        "rep_seed": seeds[rep_idx],
         "raw_mean": float(gaps.mean()),
         "raw_std": float(gaps.std(ddof=0)),
+        "raw_sem": sem,
         "n_total": int(len(gaps)),
     }
 
@@ -321,13 +328,18 @@ def plot_polar_density(a1, a2, title, outpath, nbins=40):
     plt.close(fig)
 
 
-def plot_joint_angle_heatmap(a1, a2, title, outpath, nbins=80):
+def plot_joint_angle_heatmap(a1, a2, title, outpath, nbins=80, q_vmax=0.995):
     fig, ax = plt.subplots(figsize=SQUARE_FIGSIZE)
-    hist = ax.hist2d(
-        a1,
-        a2,
-        bins=nbins,
-        range=[[-np.pi, np.pi], [-np.pi, np.pi]],
+    hist = joint_hist2d_logcounts(a1, a2, nbins=nbins)
+    vmax = max(float(np.quantile(hist, q_vmax)), 1e-6)
+    image = ax.imshow(
+        hist.T,
+        extent=[-np.pi, np.pi, -np.pi, np.pi],
+        origin="lower",
+        interpolation="nearest",
+        aspect="equal",
+        vmin=0.0,
+        vmax=vmax,
         cmap=HEATMAP_CMAP,
     )
     ax.plot([-np.pi, np.pi], [-np.pi, np.pi], linestyle="--", linewidth=0.9, color=DIAGONAL_COLOR)
@@ -335,8 +347,8 @@ def plot_joint_angle_heatmap(a1, a2, title, outpath, nbins=80):
     ax.set_ylabel(r"Angle $a_2$ (modality 2)")
     ax.set_title(title)
     prettify_ax(ax)
-    cbar = fig.colorbar(hist[-1], ax=ax, fraction=0.046, pad=0.03)
-    cbar.set_label("Count")
+    cbar = fig.colorbar(image, ax=ax, fraction=0.046, pad=0.03)
+    cbar.set_label("log(1+count)")
     cbar.ax.tick_params(labelsize=8)
     fig.tight_layout()
     fig.savefig(outpath, bbox_inches="tight")
@@ -451,6 +463,7 @@ def run_static_outputs(
     device,
     sigmas,
     seeds,
+    representative_seed,
     steps,
     B,
     lr,
@@ -465,6 +478,7 @@ def run_static_outputs(
     gap_band_highs = []
     repr_cache = {}
     summary_label = None
+    theta_eval_shared = _build_shared_theta_eval(representative_seed, n_eval, mix_w, kappa, device)
 
     for sigma in sigmas:
         gaps = []
@@ -484,14 +498,14 @@ def run_static_outputs(
             )
             gaps.append(result["gap"])
 
-        summary = summarize_seed_gaps(gaps, seeds)
+        summary = summarize_seed_gaps(gaps)
         gap_centers.append(summary["center"])
         gap_band_lows.append(summary["band_low"])
         gap_band_highs.append(summary["band_high"])
         summary_label = summary["label"]
 
         rep_result = run_multimodal_cosine(
-            seed=summary["rep_seed"],
+            seed=representative_seed,
             device=device,
             steps=steps,
             B=B,
@@ -503,13 +517,15 @@ def run_static_outputs(
             kappa=kappa,
             n_eval=n_eval,
             return_repr=True,
+            theta_eval=theta_eval_shared,
         )
         repr_cache[sigma] = rep_result["angles"]
 
         message = (
             f"[cosine] sigma={sigma:.2f}: raw mean±std = {summary['raw_mean']:.4f} ± {summary['raw_std']:.4f}"
-            f" | plotted {summary['short_label']} across {summary['n_total']} seeds"
-            f" | representative seed = {summary['rep_seed']}"
+            f" | plotted {summary['short_label']} = {summary['center']:.4f} ± {summary['raw_sem']:.4f}"
+            f" across {summary['n_total']} seeds"
+            f" | representative visual seed = {representative_seed}"
         )
         print(message)
 
@@ -563,8 +579,7 @@ def run_animation_output(
     fps,
     animation_kind,
 ):
-    set_seed(seed)
-    theta_eval_shared = sample_theta_mixture(n_eval, w=mix_w, kappa=kappa, device=device)
+    theta_eval_shared = _build_shared_theta_eval(seed, n_eval, mix_w, kappa, device)
 
     frames_by_sigma = {}
     frame_steps_ref = None
@@ -610,7 +625,12 @@ def build_parser():
     parser.add_argument("--skip-static", action="store_true", help="Skip static PDF generation.")
     parser.add_argument("--make-animation", action="store_true", help="Also generate the joint-angle animation.")
     parser.add_argument("--animation-kind", choices=("gif", "mp4"), default="gif", help="Animation file format.")
-    parser.add_argument("--animation-seed", type=int, default=0, help="Seed used for the animation run.")
+    parser.add_argument(
+        "--animation-seed",
+        type=int,
+        default=0,
+        help="Seed used for the animation and the representative static visuals.",
+    )
     parser.add_argument("--n-seeds", type=int, default=20, help="Number of seeds for the static aggregation.")
     parser.add_argument("--sigmas", type=float, nargs="+", default=[0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7])
     parser.add_argument("--steps", type=int, default=2000)
@@ -647,6 +667,7 @@ def main(argv=None):
             device=device,
             sigmas=sigmas,
             seeds=list(range(args.n_seeds)),
+            representative_seed=args.animation_seed,
             steps=args.steps,
             B=args.batch_size,
             lr=args.lr,
@@ -680,3 +701,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
+    

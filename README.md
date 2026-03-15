@@ -1,7 +1,7 @@
 # InfoNCE Geometry
 
 This repository contains the numerical and COCO-based experiments used in the paper
-*The Geometric Mechanics of Contrastive Representation Learning: Alignment Potentials, Entropic Dispersion, and Cross-Modal Divergence*
+*The Geometric Mechanics of Contrastive Learning: Alignment Potentials, Entropic Dispersion, and Modality Gap*
 ([arXiv:2601.19597](https://arxiv.org/abs/2601.19597)).
 
 Each experiment can be run directly from its folder, and most outputs are written next to the script or into an explicitly configured output directory.
@@ -40,8 +40,6 @@ InfoNCE_Geometry/
 - `open_clip_torch`
 - `pycocotools`
 
-GPU is optional for the synthetic experiments, but strongly recommended for the COCO experiments.
-
 If you want to save MP4 animations, install `ffmpeg`. GIF export works through Pillow.
 
 ## Installation
@@ -71,31 +69,28 @@ python large_batch_consistency.py
 
 Outputs:
 
-- `grad_alignment_*.pdf`
-- `grad_relerr_*.pdf`
+- `grad_alignment_comparison.pdf`
+- `grad_relerr_comparison.pdf`
 
 Unimodal Gibbs comparison on the sphere:
 
 ```bash
 cd numerical_val/unimodal_gibbs
 python unimodal_gibbs.py
-python unimodal_gibbs_onerow.py
 ```
 
 Outputs include:
 
-- `animation/uni_train_s2_potential_and_overlays.pdf`
-- `animation/uni_train_concentration_vs_tau_s2.pdf`
+- `uni_train_s2_potential_and_overlays.pdf`
+- `uni_train_s2_overlay_row5.pdf`
 - `uni_train_s2_overlay_row4.pdf`
+- `uni_train_concentration_vs_tau_s2.pdf`
 
-Optional animation scripts:
+To also save an animation from the same script:
 
 ```bash
 cd numerical_val/unimodal_gibbs
-python unimodal_gibbs_animation.py
-
-cd ../modality_gap
-python modality_gap_animation.py
+python unimodal_gibbs.py --make-animation
 ```
 
 Multimodal modality-gap toy experiment:
@@ -111,6 +106,28 @@ Outputs include:
 - `mm_polar_*.pdf`
 - `mm_joint_*.pdf`
 - `mm_delta_*.pdf`
+
+For the static gap curve, the script uses the raw mean across seeds with a standard-error band:
+
+- all seeds are included in the curve summary
+- the plotted line is the mean gap across seeds
+- the shaded band is plus/minus one standard error of the mean (SEM)
+
+With the default `20` seeds, the curve is summarized over all `20` runs automatically.
+
+The per-sigma static visualizations (`mm_polar_*`, `mm_joint_*`, `mm_delta_*`) use one fixed representative seed, controlled by `--animation-seed` (default `0`), together with the same shared evaluation angles used by the animation path.
+
+```bash
+cd numerical_val/modality_gap
+python multimodal_modality_gap.py
+```
+
+To also save the joint-angle animation:
+
+```bash
+cd numerical_val/modality_gap
+python multimodal_modality_gap.py --make-animation
+```
 
 ### 2. COCO experiments
 
@@ -267,4 +284,3 @@ These artifacts let you inspect the reported results without rerunning the full 
 - `coco_pretrained_gap.py` can reuse cached embeddings via `--use_cache`, but it will check that the cache matches the requested checkpoint.
 - `--shuffle_control` is useful as a sanity check: retrieval should collapse when pairings are shuffled, while marginal-gap statistics should change much less.
 - OpenCLIP model weights may be downloaded the first time you use a model/pretrained combination.
-- COCO training and evaluation can be slow on CPU.

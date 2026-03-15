@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 
 from __future__ import annotations
-import os, glob, json, re, argparse
+import os, glob, json, re, argparse, sys
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
+
+
+NUMERICAL_ROOT = Path(__file__).resolve().parents[1] / "numerical_val"
+if str(NUMERICAL_ROOT) not in sys.path:
+    sys.path.append(str(NUMERICAL_ROOT))
+
+from plot_style import GRID_COLOR, build_series_color_map, set_plot_style, styled_legend
 
 # -------------------------
 # Parsing helpers
@@ -161,38 +169,28 @@ def write_tables(rows: List[Dict[str, Any]], out_txt: str, digits: int = 3):
 # -------------------------
 # Plot style helpers (similar to your Exp1)
 # -------------------------
-plt.rcParams.update({
-    "font.family": "serif",
-    "font.size": 14,
-})
+SUMMARY_FIGSIZE = (4.45, 3.05)
 
 def _setup_axes(ax, ax2, x_label: str, left_label: str, right_label: str, grid: bool):
     ax.set_xlabel(x_label)
     ax.set_ylabel(left_label)
     ax2.set_ylabel(right_label)
 
-    # Grids (toggle)
     if grid:
-        ax.grid(True, which="major", linestyle="--", linewidth=0.6, color="gray", alpha=0.5)
-        ax2.grid(True, which="major", linestyle=":", linewidth=0.6, color="gray", alpha=0.3)
+        ax.grid(True, which="major", linestyle=":", linewidth=0.7, color=GRID_COLOR, alpha=0.85)
     else:
         ax.grid(False)
-        ax2.grid(False)
+    ax2.grid(False)
+    ax.spines["right"].set_visible(False)
+    ax2.spines["top"].set_visible(False)
+    ax2.spines["left"].set_visible(False)
+    ax2.spines["bottom"].set_visible(False)
+    ax2.patch.set_alpha(0.0)
+    ax.tick_params(direction="out", top=False, right=False)
+    ax2.tick_params(direction="out", left=False, right=True)
 
-    # Black spines
-    for axis in (ax, ax2):
-        for spine in axis.spines.values():
-            spine.set_edgecolor("black")
-            spine.set_linewidth(1.0)
-            spine.set_visible(True)
-
-    # Inward ticks
-    ax.tick_params(direction="in", length=5, width=0.8, colors="black", top=True, right=False)
-    ax2.tick_params(direction="in", length=5, width=0.8, colors="black", left=False, right=True)
-
-def _build_model_color_map(models: List[str], cmap_name: str = "tab10") -> Dict[str, Any]:
-    cmap = plt.get_cmap(cmap_name)
-    return {m: cmap(i % cmap.N) for i, m in enumerate(models)}
+def _build_model_color_map(models: List[str]) -> Dict[str, Any]:
+    return build_series_color_map(models)
 
 
 def plot_exp2_curve_and_bar(
@@ -202,13 +200,12 @@ def plot_exp2_curve_and_bar(
     retrieval_label: str,
     out_prefix: str,
     dpi: int = 300,
-    grid: bool = False,
+    grid: bool = True,
     annotate_last: bool = True,
     bar_width: float = 0.08,
     capsize: int = 3,
     linewidth: float = 1.6,
     markersize: int = 5,
-    cmap_name: str = "tab10",
 ):
     """
     One plot:
@@ -226,28 +223,19 @@ def plot_exp2_curve_and_bar(
         print("[warn] empty rows")
         return
 
-    color_map = _build_model_color_map(models, cmap_name=cmap_name)
+    color_map = _build_model_color_map(models)
 
-    fig, ax = plt.subplots(figsize=(6.6, 4.8))
+    fig, ax = plt.subplots(figsize=SUMMARY_FIGSIZE)
     ax2 = ax.twinx()
 
-    ax.set_xlabel("Corruption probability p")
-    ax.set_ylabel(retrieval_label)
-    ax2.set_ylabel("Centroid gap")
-
-    if grid:
-        ax.grid(True, which="major", linestyle="--", linewidth=0.6, color="gray", alpha=0.35)
-    else:
-        ax.grid(False)
-
-    for axis in (ax, ax2):
-        for spine in axis.spines.values():
-            spine.set_edgecolor("black")
-            spine.set_linewidth(1.0)
-            spine.set_visible(True)
-
-    ax.tick_params(direction="in", length=5, width=0.8, colors="black", top=True, right=False)
-    ax2.tick_params(direction="in", length=5, width=0.8, colors="black", left=False, right=True)
+    _setup_axes(
+        ax,
+        ax2,
+        x_label="Corruption probability p",
+        left_label=retrieval_label,
+        right_label="Centroid gap",
+        grid=grid,
+    )
 
     xs = np.array(ps, dtype=float)
 
@@ -324,9 +312,9 @@ def plot_exp2_curve_and_bar(
                     xytext=(dx, 10),
                     ha=ha,
                     va="bottom",
-                    fontsize=14,
+                    fontsize=8.5,
                     color=col,
-                    bbox=dict(boxstyle="square,pad=0.15", fc="white", ec="none", alpha=0.65),
+                    bbox=dict(boxstyle="square,pad=0.15", fc="white", ec="none", alpha=0.75),
                 )
 
         # Legend proxies (same color)
@@ -347,16 +335,12 @@ def plot_exp2_curve_and_bar(
 
     # Legend: 2 lines (one per model), each line shows curve glyph + bar glyph
     from matplotlib.legend_handler import HandlerTuple
-    ax.legend(
-        legend_handles,
-        legend_labels,
+    styled_legend(
+        ax,
+        handles=legend_handles,
+        labels=legend_labels,
         handler_map={tuple: HandlerTuple(ndivide=None)},
         loc="lower left",
-        frameon=True,
-        edgecolor="gray",
-        fancybox=False,
-        framealpha=0.85,
-        fontsize=10,
     )
 
     # x ticks at the true p values (center positions)
@@ -364,12 +348,12 @@ def plot_exp2_curve_and_bar(
     ax.set_xticks(xs)
     ax.set_xticklabels([f"{p:.2f}" for p in ps])
 
-    plt.tight_layout()
+    fig.tight_layout()
     tag = retrieval_mean_key.lower().replace("_mean", "")
     out_png = f"{out_prefix}_p_curve_{tag}_bar_centroid.png"
     out_pdf = f"{out_prefix}_p_curve_{tag}_bar_centroid.pdf"
-    plt.savefig(out_png, dpi=dpi, bbox_inches="tight")
-    plt.savefig(out_pdf, bbox_inches="tight")
+    fig.savefig(out_png, dpi=dpi, bbox_inches="tight")
+    fig.savefig(out_pdf, bbox_inches="tight")
     print(f"Wrote: {out_png}")
     print(f"Wrote: {out_pdf}")
     plt.close(fig)
@@ -385,10 +369,14 @@ def main():
     ap.add_argument("--digits", type=int, default=3)
     ap.add_argument("--dpi", type=int, default=300)
     ap.add_argument("--annotate", action="store_true")
-    ap.add_argument("--grid", action="store_true", help="Enable dashed/dotted grids (default off).")
+    ap.set_defaults(grid=True)
+    ap.add_argument("--grid", dest="grid", action="store_true", help="Enable the shared dotted grid style.")
+    ap.add_argument("--no-grid", dest="grid", action="store_false", help="Disable background grid lines.")
     ap.add_argument("--which", choices=["avg", "i2t", "t2i", "all"], default="avg",
                     help="Which retrieval metric to plot on left axis.")
     args = ap.parse_args()
+
+    set_plot_style()
 
     raw = load_jsons(args.result_dir)
     if len(raw) == 0:

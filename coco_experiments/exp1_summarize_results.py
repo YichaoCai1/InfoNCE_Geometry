@@ -19,11 +19,20 @@ from __future__ import annotations
 import os
 import glob
 import json
+import sys
 import argparse
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import matplotlib.pyplot as plt
+
+
+NUMERICAL_ROOT = Path(__file__).resolve().parents[1] / "numerical_val"
+if str(NUMERICAL_ROOT) not in sys.path:
+    sys.path.append(str(NUMERICAL_ROOT))
+
+from plot_style import GRID_COLOR, build_series_color_map, set_plot_style, styled_legend
 
 
 def load_jsons(result_dir: str) -> List[Dict[str, Any]]:
@@ -183,38 +192,26 @@ def write_tables(table_rows: List[Dict[str, Any]], out_txt: str, digits: int = 3
     print(f"Wrote table txt: {out_txt}")
 
 
-plt.rcParams.update({
-    "font.family": "serif",
-    "font.size": 14,
-})
+SUMMARY_FIGSIZE = (4.45, 3.05)
 
 def _setup_axes(ax, ax2, x_label: str):
     ax.set_xlabel(x_label)
     ax.set_ylabel("Energy gap")
-    ax2.set_ylabel("Centroid gap")  # <-- changed
-
-    # Left axis (Energy): Stronger, dashed grid
-    ax.grid(True, which="major", linestyle="--", linewidth=0.6, color="gray", alpha=0.5)
-    # Right axis (Centroid): Lighter, dotted grid
-    ax2.grid(True, which="major", linestyle=":", linewidth=0.6, color="gray", alpha=0.3)
-
-    # Black bounding box (spines)
-    for axis in [ax, ax2]:
-        for spine in axis.spines.values():
-            spine.set_edgecolor("black")
-            spine.set_linewidth(1.0)
-            spine.set_visible(True)
-
-    # Inward ticks
-    ax.tick_params(direction="in", length=5, width=0.8, colors="black", top=True, right=False)
-    ax2.tick_params(direction="in", length=5, width=0.8, colors="black", left=False, right=True)
+    ax2.set_ylabel("Centroid gap")
+    ax.grid(True, which="major", linestyle=":", linewidth=0.7, color=GRID_COLOR, alpha=0.85)
+    ax2.grid(False)
+    ax.spines["right"].set_visible(False)
+    ax2.spines["top"].set_visible(False)
+    ax2.spines["left"].set_visible(False)
+    ax2.spines["bottom"].set_visible(False)
+    ax2.patch.set_alpha(0.0)
+    ax.tick_params(direction="out", top=False, right=False)
+    ax2.tick_params(direction="out", left=False, right=True)
 
 
-def _build_model_color_map(table_rows: List[Dict[str, Any]], cmap_name: str = "tab10") -> Dict[str, Any]:
+def _build_model_color_map(table_rows: List[Dict[str, Any]]) -> Dict[str, Any]:
     models = sorted({r.get("Model", "") for r in table_rows if r.get("Model", "")})
-    cmap = plt.get_cmap(cmap_name)
-    n = max(1, len(models))
-    return {m: cmap(i % cmap.N) for i, m in enumerate(models)}
+    return build_series_color_map(models)
 
 def dual_axis_scatter(
     table_rows: List[Dict[str, Any]],
@@ -226,9 +223,8 @@ def dual_axis_scatter(
     markersize: int = 8,
     capsize: int = 3,
     linewidth: float = 1.2,
-    cmap_name: str = "tab10",
 ):
-    color_map = _build_model_color_map(table_rows, cmap_name=cmap_name)
+    color_map = _build_model_color_map(table_rows)
 
     rows = [r for r in table_rows if r.get(x_key, None) is not None and not np.isnan(r[x_key])]
     # changed filter: require Centroid_gap instead of MMD
@@ -251,7 +247,7 @@ def dual_axis_scatter(
     labels = [r["Model"] for r in rows]
     colors = [color_map.get(lab, (0.2, 0.2, 0.2, 1.0)) for lab in labels]
 
-    fig, ax = plt.subplots(figsize=(6.6, 4.8))
+    fig, ax = plt.subplots(figsize=SUMMARY_FIGSIZE)
     ax2 = ax.twinx()
 
     _setup_axes(ax, ax2, x_label=x_label)
@@ -291,7 +287,7 @@ def dual_axis_scatter(
         fmt="o", markersize=markersize,
         linewidth=linewidth, capsize=capsize, 
         color="black", ecolor="black",
-        label="Energy gap (left axis)",
+        label="Energy gap",
         alpha=0.9
     )
 
@@ -302,18 +298,15 @@ def dual_axis_scatter(
         fmt=">", markersize=markersize,
         linewidth=linewidth, capsize=capsize,
         color="black", ecolor="black",
-        label="Centroid gap (right axis)",
+        label="Centroid gap",
         alpha=0.5
     )
 
-    ax.legend(
+    styled_legend(
+        ax,
         handles=[proxy_energy, proxy_centroid],
-        loc="best",
-        frameon=True,
-        edgecolor="gray",
-        fancybox=False,
-        framealpha=0.7,
-        fontsize=9
+        labels=["Energy gap", "Centroid gap"],
+        loc="lower left",
     )
 
     if annotate:
@@ -336,9 +329,9 @@ def dual_axis_scatter(
                 dx, ha = 8, "left"
             
             if y <= bottom_zone:
-                dy = 10
+                dy = 5
             else:
-                dy = -10
+                dy = -5
 
             ax2.annotate(
                 labels[i],
@@ -347,23 +340,23 @@ def dual_axis_scatter(
                 xytext=(dx, dy),
                 ha=ha,
                 va="bottom",
-                fontsize=14,
+                fontsize=8.5,
                 color=col,
                 annotation_clip=True,
                 bbox=dict(
                     boxstyle="square,pad=0.2",
-                    fc="none",
+                    fc="white",
                     ec="none",
                     lw=0.5,
-                    alpha=0.9,
+                    alpha=0.75,
                 ),
             )
 
-    plt.tight_layout()
+    fig.tight_layout()
     out_png = f"{out_prefix}_{x_key}_dual.png"
     out_pdf = f"{out_prefix}_{x_key}_dual.pdf"
-    plt.savefig(out_png, dpi=dpi, bbox_inches="tight")
-    plt.savefig(out_pdf, bbox_inches="tight")
+    fig.savefig(out_png, dpi=dpi, bbox_inches="tight")
+    fig.savefig(out_pdf, bbox_inches="tight")
     print(f"Wrote: {out_png}")
     print(f"Wrote: {out_pdf}")
     plt.close(fig)
@@ -381,8 +374,7 @@ def main():
     raw = load_jsons(args.result_dir)
     table_rows = build_table_rows(raw)
 
-    # Aesthetic style (matplotlib style only; no seaborn dependency)
-    plt.style.use("seaborn-v0_8-whitegrid")
+    set_plot_style()
 
     # Write table txt (Markdown + LaTeX)
     out_txt = f"{args.out_prefix}_table.txt"

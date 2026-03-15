@@ -1,44 +1,28 @@
 import math
+import sys
+from pathlib import Path
+
 import numpy as np
 import torch
-import matplotlib.ticker as mticker
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 
+NUMERICAL_ROOT = Path(__file__).resolve().parents[1]
+if str(NUMERICAL_ROOT) not in sys.path:
+    sys.path.append(str(NUMERICAL_ROOT))
 
-# ----------------------------
-# Plot style
-# ----------------------------
-def set_plot_style():
-    plt.rcParams.update({
-        "font.size": 15,
-        "axes.titlesize": 9,
-        "axes.labelsize": 9,
-        "legend.fontsize": 8,
-        "xtick.labelsize": 8,
-        "ytick.labelsize": 8,
-
-        # lighter strokes
-        "lines.linewidth": 1.0,
-        "lines.markersize": 3,
-        "axes.linewidth": 0.8,
-        "xtick.major.width": 0.8,
-        "ytick.major.width": 0.8,
-
-        "savefig.dpi": 600,
-    })
-
-
-def prettify_ax(ax):
-    ax.grid(True, which="both", linestyle=":", linewidth=0.6, alpha=0.8)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-
+from plot_style import (
+    CURVE_FIGSIZE,
+    PRIMARY_COLOR,
+    SECONDARY_COLOR,
+    prettify_ax,
+    set_plot_style,
+    styled_legend,
+)
 
 def set_seed(seed: int):
     torch.manual_seed(seed)
     np.random.seed(seed)
-
 
 # ----------------------------
 # Data: mixture of Gaussians
@@ -49,7 +33,6 @@ def sample_mog(n: int, m: int, k: int = 4, sep: float = 4.0, sigma: float = 1.0,
     means = means * sep
     comp = torch.randint(low=0, high=k, size=(n,), device=device)
     return means[comp] + sigma * torch.randn(n, m, device=device)
-
 
 # ----------------------------
 # Encoder
@@ -64,11 +47,8 @@ def encode(W: torch.Tensor, x: torch.Tensor, mode: str):
         raise ValueError(f"Unknown mode: {mode}")
     return z
 
-
 # ----------------------------
 # Vectorized loss matching your ℓ_B form
-# ℓ = -(1/τ)s_pos + log( exp(s_pos/τ) + Σ exp(s_neg/τ) )
-# Here we average over B anchors for stability.
 # ----------------------------
 def unimodal_infonce_loss_batch(z, v, wnegs, tau: float, kind: str, rbf_scale: float = 1.0):
     """
@@ -84,7 +64,6 @@ def unimodal_infonce_loss_batch(z, v, wnegs, tau: float, kind: str, rbf_scale: f
         s_negs = (z @ wnegs.t())                 # [B, N]
     elif kind == "rbf":
         # s = -scale * ||z-w||^2
-        # dist^2(z,w) = ||z||^2 + ||w||^2 - 2 z·w
         z2 = (z * z).sum(dim=1, keepdim=True)    # [B,1]
         w2 = (wnegs * wnegs).sum(dim=1).view(1, N)  # [1,N]
         zv = z @ wnegs.t()                       # [B,N]
@@ -101,18 +80,14 @@ def unimodal_infonce_loss_batch(z, v, wnegs, tau: float, kind: str, rbf_scale: f
     loss = -(s_pos / tau) + logZ                                  # [B]
     return loss.mean()
 
-
 def flat_grad(g: torch.Tensor):
     return g.detach().reshape(-1)
-
 
 def cos_sim(a: torch.Tensor, b: torch.Tensor):
     return F.cosine_similarity(a, b, dim=0).item()
 
-
 def rel_err(a: torch.Tensor, b: torch.Tensor, eps=1e-12):
     return (a - b).norm().item() / (b.norm().item() + eps)
-
 
 # ----------------------------
 # One-seed run
@@ -141,13 +116,13 @@ def run_one_seed(seed: int, Ns, Nref: int, B: int = 64,
     W = (torch.randn(d, m, device=device) / math.sqrt(m)).requires_grad_(True)
 
     # B anchors/positives + shared negative pool
-    x = sample_mog(B, m, k=mog_k, sep=mog_sep, sigma=mog_sigma, device=device)      # [B,m]
-    x_pos = x + aug_use * torch.randn_like(x)                                       # [B,m]
-    x_negs = sample_mog(Nref, m, k=mog_k, sep=mog_sep, sigma=mog_sigma, device=device)  # [Nref,m]
+    x = sample_mog(B, m, k=mog_k, sep=mog_sep, sigma=mog_sigma, device=device)      
+    x_pos = x + aug_use * torch.randn_like(x)                                       
+    x_negs = sample_mog(Nref, m, k=mog_k, sep=mog_sep, sigma=mog_sigma, device=device)  
 
-    z = encode(W, x, mode=emb_mode)            # [B,d]
-    v = encode(W, x_pos, mode=emb_mode)        # [B,d]
-    w_all = encode(W, x_negs, mode=emb_mode)   # [Nref,d]
+    z = encode(W, x, mode=emb_mode)            
+    v = encode(W, x_pos, mode=emb_mode)        
+    w_all = encode(W, x_negs, mode=emb_mode)   
 
     # reference gradient
     loss_ref = unimodal_infonce_loss_batch(z, v, w_all, tau=tau_use, kind=critic_kind, rbf_scale=rbf_scale)
@@ -164,49 +139,69 @@ def run_one_seed(seed: int, Ns, Nref: int, B: int = 64,
 
     return np.array(cos_vals), np.array(err_vals)
 
+# ----------------------------
+# Plotting Comparison (Two distinct figures)
+# ----------------------------
+def plot_method_comparison(Ns, results_dict):
+    """
+    Plots the alignment and relative error for multiple methods on separate figures.
+    results_dict: dict of the form { "Method Name": {"cos": all_cos_array, "err": all_err_array} }
+    """
+    # Create two separate figures
+    fig1, ax1 = plt.subplots(figsize=CURVE_FIGSIZE)
+    fig2, ax2 = plt.subplots(figsize=CURVE_FIGSIZE)
 
-def aggregate_and_save(Ns, all_cos, all_err, n_seeds, tag: str):
-    cos_mean, cos_std = all_cos.mean(0), all_cos.std(0)
-    err_mean, err_std = all_err.mean(0), all_err.std(0)
+    colors = [PRIMARY_COLOR, SECONDARY_COLOR]
     
-    # standard errors
-    # cos_sem = cos_std / np.sqrt(n_seeds)
-    # err_sem = err_std / np.sqrt(n_seeds)
-    cos_sem = cos_std
-    err_sem = err_std
+    for idx, (label_tag, data) in enumerate(results_dict.items()):
+        all_cos = data["cos"]
+        all_err = data["err"]
+        
+        cos_mean, cos_std = all_cos.mean(0), all_cos.std(0)
+        err_mean, err_std = all_err.mean(0), all_err.std(0)
+        
+        c = colors[idx % len(colors)]
+        
+        # --- Figure 1: Cosine similarity ---
+        ax1.fill_between(Ns, cos_mean - cos_std, cos_mean + cos_std, color=c, alpha=0.18, linewidth=0, zorder=0)
+        ax1.plot(Ns, cos_mean, marker="o", color=c, zorder=1, label=label_tag)
+
+        # --- Figure 2: Relative error ---
+        ax2.fill_between(Ns, err_mean - err_std, err_mean + err_std, color=c, alpha=0.18, linewidth=0, zorder=0)
+        ax2.plot(Ns, err_mean, marker="o", color=c, zorder=1, label=label_tag)
+
+    # Format Figure 1 (Alignment)
+    ax1.set_xscale("log", base=2)
+    ax1.set_xticks(Ns)
+    ax1.set_xticklabels([str(n) for n in Ns])
+    ax1.set_ylim(0.2, 1.05)
+    ax1.set_xlabel("Number of negatives $N$")
+    ax1.set_ylabel(r"$\cos(\mathsf{g}_N, \mathsf{g}_{\mathrm{ref}})$")
+    ax1.set_title("Gradient alignment vs $N$")
+    styled_legend(ax1, loc="lower right")
+    prettify_ax(ax1)
     
-    # Plot 1: cosine similarity
-    fig, ax = plt.subplots(figsize=(3.35, 2.6))
-    ax.fill_between(Ns, cos_mean - cos_sem, cos_mean + cos_sem, color='C0', alpha=0.2, linewidth=0, zorder=0)
-    ax.plot(Ns, cos_mean, marker="o", markersize=2, color='C0', linewidth=1, zorder=1, label="Mean $\pm$ SEM")
-    ax.set_xscale("log", base=2)
-    ax.set_xticks(Ns)
-    ax.set_xticklabels([str(n) for n in Ns])
-    ax.set_ylim(0.2, 1.01)
-    ax.set_xlabel("Number of negatives $N$")
-    ax.set_ylabel(r"$\cos(\mathsf{g}_N, \mathsf{g}_{\mathrm{ref}})$")
-    ax.set_title(f"Gradient alignment vs $N$")
-    prettify_ax(ax)
-    fig.tight_layout()
-    fig.savefig(f"grad_alignment_{tag}.pdf", bbox_inches="tight")
-    plt.close(fig)
+    fig1.tight_layout()
+    fig1.savefig("grad_alignment_comparison.pdf", bbox_inches="tight")
+    plt.close(fig1)
 
-    # Plot 2: relative error
-    fig, ax = plt.subplots(figsize=(3.35, 2.6))
-    ax.fill_between(Ns, err_mean - err_sem, err_mean + err_sem, color='C0', alpha=0.2, linewidth=0, zorder=0)
-    ax.plot(Ns, err_mean, marker="o", markersize=2, color='C0', linewidth=1, zorder=1, label="Mean $\pm$ SEM")
-    ax.set_xscale("log", base=2)
-    ax.set_xticks(Ns)
-    ax.set_xticklabels([str(n) for n in Ns])
-    ax.set_xlabel("Number of negatives $N$")
-    ax.set_ylabel(r"$\|\mathsf{g}_N-\mathsf{g}_{\mathrm{ref}}\|/\|\mathsf{g}_{\mathrm{ref}}\|$")
-    ax.set_title(f"Relative gradient error vs $N$")
-    prettify_ax(ax)
-    fig.tight_layout()
-    fig.savefig(f"grad_relerr_{tag}.pdf", bbox_inches="tight")
-    plt.close(fig)
+    # Format Figure 2 (Relative Error)
+    ax2.set_xscale("log", base=2)
+    ax2.set_xticks(Ns)
+    ax2.set_xticklabels([str(n) for n in Ns])
+    ax2.set_xlabel("Number of negatives $N$")
+    ax2.set_ylabel(r"$\|\mathsf{g}_N-\mathsf{g}_{\mathrm{ref}}\|/\|\mathsf{g}_{\mathrm{ref}}\|$")
+    ax2.set_title("Relative gradient error vs $N$")
+    styled_legend(ax2, loc="upper right")
+    prettify_ax(ax2)
+    
+    fig2.tight_layout()
+    fig2.savefig("grad_relerr_comparison.pdf", bbox_inches="tight")
+    plt.close(fig2)
 
-
+# ----------------------------
+# Main
+# ----------------------------
 def main():
     set_plot_style()
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -217,7 +212,11 @@ def main():
     Nseeds = 20
     seeds = range(Nseeds)
 
+    # Dictionary to store results for both methods
+    results = {}
+
     for kind in ["cosine", "rbf"]:
+        print(f"Running simulation for: {kind}...")
         cos_list, err_list = [], []
         for s in seeds:
             c, e = run_one_seed(
@@ -231,12 +230,15 @@ def main():
 
         all_cos = np.stack(cos_list, axis=0)
         all_err = np.stack(err_list, axis=0)
+        
+        # Create a clean label for the legend
+        label = "Cosine (Sphere)" if kind == "cosine" else "RBF (Bounded)"
+        results[label] = {"cos": all_cos, "err": all_err}
 
-        tag = "cosine_sphere" if kind == "cosine" else "rbf_bounded"
-        aggregate_and_save(Ns, all_cos, all_err, n_seeds=Nseeds, tag=tag)
-
-    print("Saved: grad_alignment_*.pdf and grad_relerr_*.pdf")
-
+    # Plot everything together into two files
+    print("Generating plots...")
+    plot_method_comparison(Ns, results)
+    print("Saved: grad_alignment_comparison.pdf and grad_relerr_comparison.pdf")
 
 if __name__ == "__main__":
     main()

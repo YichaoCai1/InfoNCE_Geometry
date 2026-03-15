@@ -28,6 +28,8 @@ from plot_style import (
     styled_legend,
 )
 
+EVAL_SEED_OFFSET = 10_000_019
+
 
 def set_seed(seed: int):
     torch.manual_seed(seed)
@@ -61,6 +63,18 @@ def _restore_rng_state(state):
     np.random.set_state(state["numpy"])
     if "cuda" in state:
         torch.cuda.set_rng_state(state["cuda"], state["cuda_device"])
+
+
+def _build_eval_pair(seed, n_eval, misalign_sigma, mix_w, kappa, device, theta_eval=None):
+    rng_state = _capture_rng_state(device)
+    set_seed(seed + EVAL_SEED_OFFSET)
+    if theta_eval is None:
+        theta_eval = sample_theta_mixture(n_eval, w=mix_w, kappa=kappa, device=device)
+    else:
+        theta_eval = theta_eval.to(device)
+    theta2_eval = wrap_pi(theta_eval + misalign_sigma * torch.randn_like(theta_eval))
+    _restore_rng_state(rng_state)
+    return theta_eval, theta2_eval
 
 
 def sample_theta_mixture(n, w=0.7, mu1=0.0, mu2=math.pi, kappa=6.0, device="cpu"):
@@ -172,6 +186,13 @@ def eval_angles(f, g, theta_eval, theta2_eval, obs_noise=0.02):
     return a1, a2
 
 
+def eval_angles_preserve_rng(f, g, theta_eval, theta2_eval, obs_noise=0.02):
+    rng_state = _capture_rng_state(theta_eval.device)
+    a1, a2 = eval_angles(f, g, theta_eval, theta2_eval, obs_noise=obs_noise)
+    _restore_rng_state(rng_state)
+    return a1, a2
+
+
 def run_multimodal_cosine(
     seed=0,
     device="cpu",
@@ -195,21 +216,22 @@ def run_multimodal_cosine(
     f, g = build_linear_encoders(device=device)
     opt = torch.optim.Adam(list(f.parameters()) + list(g.parameters()), lr=lr)
 
-    if theta_eval is not None:
-        theta_eval = theta_eval.to(device)
-    theta2_eval = None
+    theta_eval, theta2_eval = _build_eval_pair(
+        seed=seed,
+        n_eval=n_eval,
+        misalign_sigma=misalign_sigma,
+        mix_w=mix_w,
+        kappa=kappa,
+        device=device,
+        theta_eval=theta_eval,
+    )
 
     frames = []
     frame_steps = []
     if return_hist:
-        rng_state = _capture_rng_state(device)
-        if theta_eval is None:
-            theta_eval = sample_theta_mixture(n_eval, w=mix_w, kappa=kappa, device=device)
-        theta2_eval = wrap_pi(theta_eval + misalign_sigma * torch.randn_like(theta_eval))
-        a1_0, a2_0 = eval_angles(f, g, theta_eval, theta2_eval, obs_noise=obs_noise)
+        a1_0, a2_0 = eval_angles_preserve_rng(f, g, theta_eval, theta2_eval, obs_noise=obs_noise)
         frames.append(joint_hist2d_logcounts(a1_0, a2_0, nbins=nbins))
         frame_steps.append(0)
-        _restore_rng_state(rng_state)
 
     for step in range(steps):
         theta = sample_theta_mixture(B, w=mix_w, kappa=kappa, device=device)
@@ -228,14 +250,9 @@ def run_multimodal_cosine(
 
         step_now = step + 1
         if return_hist and (step_now % log_every == 0 or step_now == steps):
-            a1_hist, a2_hist = eval_angles(f, g, theta_eval, theta2_eval, obs_noise=obs_noise)
+            a1_hist, a2_hist = eval_angles_preserve_rng(f, g, theta_eval, theta2_eval, obs_noise=obs_noise)
             frames.append(joint_hist2d_logcounts(a1_hist, a2_hist, nbins=nbins))
             frame_steps.append(step_now)
-
-    if theta_eval is None:
-        theta_eval = sample_theta_mixture(n_eval, w=mix_w, kappa=kappa, device=device)
-    if theta2_eval is None:
-        theta2_eval = wrap_pi(theta_eval + misalign_sigma * torch.randn_like(theta_eval))
 
     with torch.no_grad():
         x1 = features_from_theta(theta_eval, obs_noise=obs_noise).to(device)

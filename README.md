@@ -1,7 +1,7 @@
 # InfoNCE Geometry
 
 This repository contains the numerical and COCO-based experiments used in the paper
-*The Geometric Mechanics of Contrastive Learning: Alignment Potentials, Entropic Dispersion, and Modality Gap*
+*The Geometric Mechanics of Contrastive Representation Learning: Alignment Potentials, Entropic Dispersion, and Cross-Modal Divergence*
 ([arXiv:2601.19597](https://arxiv.org/abs/2601.19597)).
 
 Each experiment can be run directly from its folder, and most outputs are written next to the script or into an explicitly configured output directory.

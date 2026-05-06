@@ -1,6 +1,6 @@
 # InfoNCE Geometry
 
-This repository contains the numerical and COCO-based experiments used in the paper
+This repository contains the numerical and COCO-based experiments used in the paper (**ICML 2026**)
 *The Geometric Mechanics of Contrastive Representation Learning: Alignment Potentials, Entropic Dispersion, and Cross-Modal Divergence*
 ([arXiv:2601.19597](https://arxiv.org/abs/2601.19597)).
 

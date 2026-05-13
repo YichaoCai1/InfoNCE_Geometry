@@ -267,17 +267,6 @@ This writes:
 - `exp2_summary/exp2_table.txt`
 - paired PNG/PDF plots under `exp2_summary/`
 
-## Checked-In Artifacts
-
-This repository already includes saved outputs from the reported runs:
-
-- `coco_experiments/exp1_results/`: pretrained-model evaluation JSONs and caches
-- `coco_experiments/exp1_summary/`: Experiment 1 tables and plots
-- `coco_experiments/exp2_samecat_runs/`: fine-tuned checkpoints
-- `coco_experiments/exp2_results/`: Experiment 2 evaluation JSONs and caches
-- `coco_experiments/exp2_summary/`: Experiment 2 tables and plots
-
-These artifacts let you inspect the reported results without rerunning the full COCO pipeline.
 
 ## Notes
 

@@ -273,3 +273,18 @@ This writes:
 - `coco_pretrained_gap.py` can reuse cached embeddings via `--use_cache`, but it will check that the cache matches the requested checkpoint.
 - `--shuffle_control` is useful as a sanity check: retrieval should collapse when pairings are shuffled, while marginal-gap statistics should change much less.
 - OpenCLIP model weights may be downloaded the first time you use a model/pretrained combination.
+
+## 🧾 Citation
+
+If you find this work useful, please cite our paper:
+
+```bibtex
+@inproceedings{
+cai2026the,
+title={The Geometric Mechanics of Contrastive Representation Learning: Alignment Potentials, Entropic Dispersion, and Cross-Modal Divergence},
+author={Yichao Cai and Zhen Zhang and Yuhang Liu and Javen Qinfeng Shi},
+booktitle={Forty-third International Conference on Machine Learning},
+year={2026},
+url={https://openreview.net/forum?id=X9VtjdBlQw}
+}
+```
